@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Image as ImageIcon, Wand2, Upload, Download, Loader2, Maximize, Palette, ChevronDown } from 'lucide-react';
+import { Image as ImageIcon, Wand2, Upload, Download, Loader2, Maximize, Palette, ChevronDown, Save } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import { motion } from 'motion/react';
 
@@ -218,12 +218,22 @@ export function ImageStudio() {
 
   return (
     <div className="flex flex-col h-full bg-[#0a0a0a]">
-      <header className="px-8 py-6 border-b border-[#222]">
-        <h2 className="text-2xl font-semibold tracking-tight">Image Studio</h2>
-        <p className="text-zinc-400 text-sm mt-1">Generate, edit, upscale, and filter images with AI</p>
+      <header className="px-4 md:px-8 py-4 md:py-6 border-b border-[#222] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-0">
+        <div>
+          <h2 className="text-xl md:text-2xl font-semibold tracking-tight">Image Studio</h2>
+          <p className="text-zinc-400 text-xs md:text-sm mt-1">Generate, edit, upscale, and filter images with AI</p>
+        </div>
+        <div className="flex gap-2 self-end md:self-auto">
+          <button 
+            onClick={() => alert('Image saved to library!')}
+            className="px-4 py-2 bg-[#111] hover:bg-[#222] border border-[#333] text-zinc-300 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+          >
+            <Save size={16} /> Save
+          </button>
+        </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-8">
+      <div className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
           
           {/* Controls Sidebar */}

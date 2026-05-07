@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2, Plus, Volume2, SquareSquare } from 'lucide-react';
+import { Send, Bot, User, Loader2, Plus, Volume2, SquareSquare, Mic, MicOff } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import { motion } from 'motion/react';
 
@@ -13,13 +13,20 @@ interface Message {
 
 export function Chatbot() {
   const [messages, setMessages] = useState<Message[]>([
-    { id: '1', role: 'model', text: 'Hello! I am your sohdAI assistant. How can I help you today?' }
+    { 
+      id: '1', 
+      role: 'model', 
+      text: 'مرحباً! أنا مساعد sohdAI الخاص بك (Chat Assistant).\nHello! I am your sohdAI Chat Assistant.\n\nيسعدني أن أقدم لك ميزاتنا الجديدة / I am happy to introduce our new features:\n• النماذج المتقدمة / Advanced Models\n• إنشاء متقدم للصور باستخدام Thinking / Advanced Image Generation using Thinking\n• وكيل كتابة الأكواد البرمجية Codex / Codex Coding Agent\n• المشروعات ونماذج GPT المخصصة / Projects and Custom GPTs\n\nكيف يمكنني مساعدتك اليوم؟ / How can I help you today?' 
+    }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState<string | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatRef = useRef<any>(null);
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -29,14 +36,64 @@ export function Chatbot() {
     // Cleanup speech synth on unmount
     return () => {
       window.speechSynthesis.cancel();
+      if (recognitionRef.current && isListening) {
+        recognitionRef.current.stop();
+      }
     };
+  }, [isListening]);
+
+  useEffect(() => {
+    // Initialize speech recognition
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'ar-SA';
+      
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+      
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInput(prev => prev + (prev ? ' ' : '') + transcript);
+      };
+      
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error", event.error);
+        if (event.error === 'not-allowed') {
+          alert('تعذر الوصول إلى الميكروفون. يرجى التأكد من منح الإذن للمتصفح. إذا كنت تستخدم التطبيق داخل نافذة مضمنة (iFrame)، يرجى فتح التطبيق في علامة تبويب جديدة.');
+        }
+        setIsListening(false);
+      };
+      
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+      
+      recognitionRef.current = recognition;
+    }
   }, []);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      alert("Voice input is not supported in your browser.");
+      return;
+    }
+    
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      recognitionRef.current.start();
+    }
+  };
 
   const initChat = () => {
     chatRef.current = ai.chats.create({
       model: 'gemini-3.1-pro-preview',
       config: {
-        systemInstruction: 'You are sohdAI, an advanced AI assistant capable of helping with text, images, video, games, and animation. You are helpful, creative, and concise.',
+        systemInstruction: "You are sohdAI, an advanced AI assistant (Chat Assistant) capable of helping with text, images, video, games, and animation. You have Advanced Models with high capacity, advanced image generation using Thinking, extended memory across different chats, Codex coding agent capabilities, expanded deep search, Projects, and Custom GPTs. You are helpful, creative, and concise. You can speak and respond in both Arabic and English based on the user's language or request.",
       }
     });
   };
@@ -46,7 +103,11 @@ export function Chatbot() {
   }, []);
 
   const handleNewChat = () => {
-    setMessages([{ id: Date.now().toString(), role: 'model', text: 'Hello! I am your sohdAI assistant. How can I help you today?' }]);
+    setMessages([{ 
+      id: Date.now().toString(), 
+      role: 'model', 
+      text: 'مرحباً! أنا مساعد sohdAI الخاص بك (Chat Assistant).\nHello! I am your sohdAI Chat Assistant.\n\nيسعدني أن أقدم لك ميزاتنا الجديدة / I am happy to introduce our new features:\n• النماذج المتقدمة / Advanced Models\n• إنشاء متقدم للصور باستخدام Thinking / Advanced Image Generation using Thinking\n• وكيل كتابة الأكواد البرمجية Codex / Codex Coding Agent\n• المشروعات ونماذج GPT المخصصة / Projects and Custom GPTs\n\nكيف يمكنني مساعدتك اليوم؟ / How can I help you today?' 
+    }]);
     initChat();
   };
 
@@ -59,6 +120,7 @@ export function Chatbot() {
     
     window.speechSynthesis.cancel(); // Stop any current speech
     const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'ar-SA';
     utterance.onend = () => setIsSpeaking(null);
     utterance.onerror = () => setIsSpeaking(null);
     
@@ -133,7 +195,7 @@ export function Chatbot() {
               {msg.role === 'user' ? <User size={20} /> : <Bot size={20} />}
             </div>
             <div className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-              <div className={`px-5 py-3.5 rounded-2xl text-sm leading-relaxed ${
+              <div className={`px-5 py-3.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
                 msg.role === 'user' 
                   ? 'bg-zinc-800 text-zinc-100 rounded-tr-sm' 
                   : 'bg-[#111] border border-[#222] text-zinc-300 rounded-tl-sm'
@@ -175,15 +237,26 @@ export function Chatbot() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             placeholder="Ask sohdAI anything..."
-            className="w-full bg-[#111] border border-[#333] rounded-full pl-6 pr-14 py-4 text-sm focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/50 transition-all placeholder:text-zinc-600"
+            className="w-full bg-[#111] border border-[#333] rounded-full pl-6 pr-24 py-4 text-sm focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/50 transition-all placeholder:text-zinc-600"
           />
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || isLoading}
-            className="absolute right-2 top-2 bottom-2 w-10 flex items-center justify-center bg-orange-500 hover:bg-orange-600 text-white rounded-full disabled:opacity-50 disabled:hover:bg-orange-500 transition-colors"
-          >
-            <Send size={16} className="ml-0.5" />
-          </button>
+          <div className="absolute right-2 top-2 bottom-2 flex gap-1">
+            <button
+              onClick={toggleListening}
+              className={`w-10 flex items-center justify-center rounded-full transition-colors ${
+                isListening ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30' : 'bg-transparent text-zinc-400 hover:text-zinc-200 hover:bg-[#222]'
+              }`}
+              title={isListening ? "Stop listening" : "Start voice input"}
+            >
+              {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+            </button>
+            <button
+              onClick={handleSend}
+              disabled={!input.trim() || isLoading}
+              className="w-10 flex items-center justify-center bg-orange-500 hover:bg-orange-600 text-white rounded-full disabled:opacity-50 disabled:hover:bg-orange-500 transition-colors"
+            >
+              <Send size={16} className="ml-0.5" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

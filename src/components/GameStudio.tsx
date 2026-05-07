@@ -1,8 +1,16 @@
 import React, { useState } from 'react';
-import { Gamepad2, Code2, Play, Box, Layers, Settings, Loader2, RefreshCw, Globe, X, Music, Maximize2, Eye, Library, Skull, Image as ImageIcon, Volume2 } from 'lucide-react';
+import { Gamepad2, Code2, Play, Box, Layers, Settings, Loader2, RefreshCw, Globe, X, Music, Maximize2, Eye, Library, Skull, Image as ImageIcon, Volume2, Save, Upload, History } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+interface Version {
+  id: string;
+  timestamp: number;
+  prompt: string;
+  code: string;
+  dimension: '2D' | '3D';
+}
 
 export function GameStudio() {
   const [prompt, setPrompt] = useState('');
@@ -16,6 +24,25 @@ export function GameStudio() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [previewMode, setPreviewMode] = useState<'preview' | 'code'>('preview');
   const [leftTab, setLeftTab] = useState<'hierarchy' | 'assets'>('hierarchy');
+
+  const [versions, setVersions] = useState<Version[]>([]);
+  const [showVersions, setShowVersions] = useState(false);
+
+  const handleSaveVersion = () => {
+    if (!code) {
+      alert('Please generate a game before saving a version!');
+      return;
+    }
+    const newVersion: Version = {
+      id: Date.now().toString(),
+      timestamp: Date.now(),
+      prompt,
+      code,
+      dimension: gameDimension
+    };
+    setVersions(prev => [newVersion, ...prev]);
+    alert('Game saved to version history!');
+  };
 
   const horrorAssets = [
     { id: '1', name: 'Bloody Zombie Model', type: '3D Model', icon: Skull },
@@ -50,6 +77,8 @@ export function GameStudio() {
         ? `Generate a simple 3D game using Three.js based on this description: ${prompt}. Provide ONLY the HTML/JS code in a single file structure that can be run in an iframe. Do not include markdown formatting like \`\`\`html, just the raw code.`
         : `Generate a simple 2D game using HTML5 Canvas and JavaScript based on this description: ${prompt}. Provide ONLY the HTML/JS code in a single file structure that can be run in an iframe. Do not include markdown formatting like \`\`\`html, just the raw code.`;
 
+      systemPrompt += `\n\nCRITICAL: For any requested sound effects or music [Use Asset: ...] or [Use Uploaded Sound: ...], you must synthesize those sounds using Web Audio API for those associated game interactions and events (like jump, explosion, coin collect, or hovering). If it is a background music asset, synthesize a continuous loop.`;
+
       if (enableMusic) {
         systemPrompt += `\n\nCRITICAL: You MUST include background music in this game. Use the Web Audio API (AudioContext) to synthesize a simple, looping chiptune or background melody that plays automatically when the user interacts with the game (e.g., on first click or keypress to bypass browser autoplay policies).`;
       }
@@ -83,17 +112,29 @@ export function GameStudio() {
 
   return (
     <div className="flex flex-col h-full bg-[#0a0a0a]">
-      <header className="px-8 py-6 border-b border-[#222] flex justify-between items-center">
+      <header className="px-4 md:px-8 py-4 md:py-6 border-b border-[#222] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-0">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Game Studio</h2>
-          <p className="text-zinc-400 text-sm mt-1">Generate interactive 2D and 3D experiences with AI</p>
+          <h2 className="text-xl md:text-2xl font-semibold tracking-tight">Game Studio</h2>
+          <p className="text-zinc-400 text-xs md:text-sm mt-1">Generate interactive 2D and 3D experiences with AI</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 self-end md:self-auto">
           <button 
             onClick={() => setShowSettings(true)}
             className="px-4 py-2 bg-[#111] border border-[#333] rounded-lg text-sm font-medium hover:bg-[#222] transition-colors flex items-center gap-2"
           >
             <Settings size={16} /> Settings
+          </button>
+          <button 
+            onClick={() => setShowVersions(true)}
+            className="px-4 py-2 bg-[#111] hover:bg-[#222] border border-[#333] text-zinc-300 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+          >
+            <History size={16} /> Versions {versions.length > 0 && `(${versions.length})`}
+          </button>
+          <button 
+            onClick={handleSaveVersion}
+            className="px-4 py-2 bg-[#111] hover:bg-[#222] border border-[#333] text-zinc-300 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+          >
+            <Save size={16} /> Save
           </button>
           <button 
             onClick={() => setShowPublish(true)}
@@ -104,9 +145,9 @@ export function GameStudio() {
         </div>
       </header>
 
-      <div className="flex-1 overflow-hidden flex">
+      <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
         {/* Left Panel - Prompt & Assets */}
-        <div className="w-80 border-r border-[#222] bg-[#0f0f0f] flex flex-col">
+        <div className="w-full md:w-80 border-b md:border-b-0 md:border-r border-[#222] bg-[#0f0f0f] flex flex-col shrink-0">
           <div className="p-6 border-b border-[#222]">
             <div className="flex bg-[#1a1a1a] p-1 rounded-lg border border-[#333] mb-4">
               <button
@@ -186,7 +227,7 @@ export function GameStudio() {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-6">
                   <div>
                     <h4 className="text-xs font-medium text-zinc-400 uppercase tracking-wide mb-2 flex items-center justify-between">
                       Horror Pack <span className="text-[10px] bg-red-500/20 text-red-500 px-1.5 py-0.5 rounded">NEW</span>
@@ -207,6 +248,87 @@ export function GameStudio() {
                           </div>
                         );
                       })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-medium text-zinc-400 uppercase tracking-wide mb-2 flex items-center justify-between">
+                      Background Music
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: 'bgm1', name: 'Chiptune Loop', type: 'Music', icon: Music },
+                        { id: 'bgm2', name: 'Ambient Horror', type: 'Music', icon: Music },
+                        { id: 'bgm3', name: 'Action Track', type: 'Music', icon: Music },
+                        { id: 'bgm4', name: 'Puzzle Theme', type: 'Music', icon: Music },
+                      ].map((asset) => {
+                        const Icon = asset.icon;
+                        return (
+                          <div 
+                            key={asset.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, asset.name)}
+                            className="bg-[#1a1a1a] border border-[#333] hover:border-orange-500/50 hover:bg-[#222] p-3 rounded-lg cursor-grab active:cursor-grabbing transition-all group"
+                          >
+                            <Icon size={20} className="text-zinc-400 group-hover:text-orange-500 mb-2 transition-colors" />
+                            <div className="text-xs font-medium text-zinc-300 truncate" title={asset.name}>{asset.name}</div>
+                            <div className="text-[10px] text-zinc-500 mt-1">{asset.type}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-medium text-zinc-400 uppercase tracking-wide mb-2 flex items-center justify-between">
+                      Sound Effects
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: 'sfx1', name: 'Jump Sound', type: 'SFX', icon: Volume2 },
+                        { id: 'sfx2', name: 'Coin Collect', type: 'SFX', icon: Volume2 },
+                        { id: 'sfx3', name: 'Explosion', type: 'SFX', icon: Volume2 },
+                        { id: 'sfx4', name: 'Game Over', type: 'SFX', icon: Volume2 },
+                      ].map((asset) => {
+                        const Icon = asset.icon;
+                        return (
+                          <div 
+                            key={asset.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, asset.name)}
+                            className="bg-[#1a1a1a] border border-[#333] hover:border-orange-500/50 hover:bg-[#222] p-3 rounded-lg cursor-grab active:cursor-grabbing transition-all group"
+                          >
+                            <Icon size={20} className="text-zinc-400 group-hover:text-orange-500 mb-2 transition-colors" />
+                            <div className="text-xs font-medium text-zinc-300 truncate" title={asset.name}>{asset.name}</div>
+                            <div className="text-[10px] text-zinc-500 mt-1">{asset.type}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    
+                    <div className="mt-4 pt-4 border-t border-[#222]">
+                      <label className="text-[10px] text-zinc-500 block mb-2 uppercase tracking-wide font-medium">Upload Custom Sound</label>
+                      <button 
+                        onClick={() => document.getElementById('sound-upload')?.click()}
+                        className="w-full py-4 rounded border border-dashed border-[#333] hover:border-orange-500/50 flex flex-col items-center justify-center text-zinc-500 hover:text-orange-500 transition-colors bg-[#1a1a1a] cursor-pointer"
+                      >
+                        <Upload size={16} className="mb-1" />
+                        <span className="text-[10px]">Select Audio File</span>
+                      </button>
+                      <input 
+                        type="file" 
+                        id="sound-upload" 
+                        accept="audio/*" 
+                        className="hidden" 
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            const fileName = e.target.files[0].name;
+                            setPrompt(prev => prev + (prev.endsWith(' ') || prev.length === 0 ? '' : ' ') + `[Use Uploaded Sound: ${fileName} for interaction] `);
+                            alert(`Sound effect "${fileName}" added to instructions!`);
+                            e.target.value = '';
+                          }
+                        }} 
+                      />
                     </div>
                   </div>
                 </div>
@@ -260,7 +382,7 @@ export function GameStudio() {
             </div>
           </div>
           
-          <div className="flex-1 relative">
+          <div className="flex-1 relative min-h-[50vh] md:min-h-0">
             {isLoading ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <Loader2 size={32} className="text-orange-500 animate-spin mb-4" />
@@ -289,6 +411,53 @@ export function GameStudio() {
           </div>
         </div>
       </div>
+
+      {/* Versions Modal */}
+      {showVersions && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-[#111] border border-[#333] rounded-2xl w-full max-w-lg p-6 max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-6 shrink-0">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2"><History size={20} className="text-orange-500"/> Version History</h3>
+              <button onClick={() => setShowVersions(false)} className="text-zinc-400 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-3 overflow-y-auto pr-2 flex-1 min-h-0">
+              {versions.length === 0 ? (
+                <div className="text-center text-zinc-500 py-8">
+                  No versions saved yet. Generate a game and click Save.
+                </div>
+              ) : (
+                versions.map((v, i) => (
+                  <div key={v.id} className="bg-[#1a1a1a] border border-[#333] rounded-xl p-4 flex flex-col gap-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="text-sm font-medium text-white mb-1">Version {versions.length - i}</div>
+                        <div className="text-xs text-zinc-500">{new Date(v.timestamp).toLocaleString()} • {v.dimension} Game</div>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setPrompt(v.prompt);
+                          setCode(v.code);
+                          setGameDimension(v.dimension);
+                          setRefreshKey(prev => prev + 1);
+                          setShowVersions(false);
+                        }}
+                        className="px-3 py-1.5 bg-[#222] hover:bg-orange-500 hover:text-white text-zinc-300 rounded text-xs font-medium transition-colors border border-[#333] hover:border-orange-500"
+                      >
+                        Restore
+                      </button>
+                    </div>
+                    <div className="text-xs text-zinc-400 truncate bg-[#111] p-2 rounded border border-[#222]">
+                      Prompt: {v.prompt}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Fullscreen Game Modal */}
       {isFullscreen && code && (

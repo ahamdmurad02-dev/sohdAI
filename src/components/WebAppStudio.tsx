@@ -1,18 +1,28 @@
 import { useState } from 'react';
-import { Layout, Code2, Loader2, RefreshCw, Monitor, Smartphone, Globe, X, Maximize2, Eye } from 'lucide-react';
+import { Layout, Code2, Loader2, RefreshCw, Monitor, Tablet, Smartphone, Globe, X, Maximize2, Eye, Save, History } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+interface Version {
+  id: string;
+  timestamp: number;
+  prompt: string;
+  code: string;
+}
 
 export function WebAppStudio() {
   const [prompt, setPrompt] = useState('');
   const [code, setCode] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
+  const [viewMode, setViewMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   const [showPublish, setShowPublish] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [previewMode, setPreviewMode] = useState<'preview' | 'code'>('preview');
+  
+  const [versions, setVersions] = useState<Version[]>([]);
+  const [showVersions, setShowVersions] = useState(false);
 
   const handleGenerate = async () => {
     if (!prompt.trim() || isLoading) return;
@@ -49,15 +59,30 @@ Provide ONLY the raw HTML code. Do not include markdown formatting like \`\`\`ht
   const handleReload = () => {
     setRefreshKey(prev => prev + 1);
   };
+  
+  const handleSaveVersion = () => {
+    if (!code) {
+      alert('Please generate an app before saving a version!');
+      return;
+    }
+    const newVersion: Version = {
+      id: Date.now().toString(),
+      timestamp: Date.now(),
+      prompt,
+      code
+    };
+    setVersions(prev => [newVersion, ...prev]);
+    alert('App saved to version history!');
+  };
 
   return (
     <div className="flex flex-col h-full bg-[#0a0a0a]">
-      <header className="px-8 py-6 border-b border-[#222] flex justify-between items-center">
+      <header className="px-4 md:px-8 py-4 md:py-6 border-b border-[#222] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-0">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Web App Studio</h2>
-          <p className="text-zinc-400 text-sm mt-1">Generate complete, single-file web applications instantly</p>
+          <h2 className="text-xl md:text-2xl font-semibold tracking-tight">Web App Studio</h2>
+          <p className="text-zinc-400 text-xs md:text-sm mt-1">Generate complete, single-file web applications instantly</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-end md:self-auto">
           <div className="flex gap-2 bg-[#1a1a1a] p-1 rounded-lg border border-[#333]">
             <button
               onClick={() => setViewMode('desktop')}
@@ -67,6 +92,15 @@ Provide ONLY the raw HTML code. Do not include markdown formatting like \`\`\`ht
               title="Desktop View"
             >
               <Monitor size={16} />
+            </button>
+            <button
+              onClick={() => setViewMode('tablet')}
+              className={`p-2 rounded-md transition-colors ${
+                viewMode === 'tablet' ? 'bg-[#333] text-white' : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+              title="Tablet View"
+            >
+              <Tablet size={16} />
             </button>
             <button
               onClick={() => setViewMode('mobile')}
@@ -79,17 +113,29 @@ Provide ONLY the raw HTML code. Do not include markdown formatting like \`\`\`ht
             </button>
           </div>
           <button 
+            onClick={() => setShowVersions(true)}
+            className="px-4 py-2.5 bg-[#111] hover:bg-[#222] border border-[#333] text-zinc-300 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ml-2"
+          >
+            <History size={16} /> Versions {versions.length > 0 && `(${versions.length})`}
+          </button>
+          <button 
+            onClick={handleSaveVersion}
+            className="px-4 py-2.5 bg-[#111] hover:bg-[#222] border border-[#333] text-zinc-300 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+          >
+            <Save size={16} /> Save
+          </button>
+          <button 
             onClick={() => setShowPublish(true)}
-            className="px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ml-2"
+            className="px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
           >
             <Globe size={16} /> Publish
           </button>
         </div>
       </header>
 
-      <div className="flex-1 overflow-hidden flex">
+      <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
         {/* Left Panel - Prompt */}
-        <div className="w-80 border-r border-[#222] bg-[#0f0f0f] flex flex-col">
+        <div className="w-full md:w-80 border-b md:border-b-0 md:border-r border-[#222] bg-[#0f0f0f] flex flex-col shrink-0">
           <div className="p-6 border-b border-[#222]">
             <label className="text-sm font-medium text-zinc-300 block mb-2">App Concept</label>
             <textarea
@@ -114,7 +160,7 @@ Provide ONLY the raw HTML code. Do not include markdown formatting like \`\`\`ht
         </div>
 
         {/* Right Panel - Preview */}
-        <div className="flex-1 bg-[#050505] relative flex flex-col items-center justify-center p-8">
+        <div className="flex-1 bg-[#050505] relative flex flex-col items-center justify-center p-4 md:p-8 min-h-[50vh]">
           <div className="absolute top-0 left-0 right-0 h-12 border-b border-[#222] flex items-center px-4 bg-[#0a0a0a] justify-between z-10 w-full">
             <div className="flex items-center gap-2">
               <div className="flex bg-[#1a1a1a] p-1 rounded-lg border border-[#333] mr-2">
@@ -169,7 +215,7 @@ Provide ONLY the raw HTML code. Do not include markdown formatting like \`\`\`ht
               ) : (
                 <div 
                   className={`bg-white rounded-lg shadow-2xl overflow-hidden transition-all duration-300 border border-[#333] ${
-                    viewMode === 'mobile' ? 'w-[375px] h-[812px]' : 'w-full h-full max-w-5xl'
+                    viewMode === 'mobile' ? 'w-[375px] h-[812px]' : viewMode === 'tablet' ? 'w-[768px] h-[1024px] max-h-[80vh]' : 'w-full h-full max-w-5xl'
                   }`}
                 >
                   <iframe 
@@ -190,6 +236,52 @@ Provide ONLY the raw HTML code. Do not include markdown formatting like \`\`\`ht
           </div>
         </div>
       </div>
+
+      {/* Versions Modal */}
+      {showVersions && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-[#111] border border-[#333] rounded-2xl w-full max-w-lg p-6 max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-6 shrink-0">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2"><History size={20} className="text-orange-500"/> Version History</h3>
+              <button onClick={() => setShowVersions(false)} className="text-zinc-400 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-3 overflow-y-auto pr-2 flex-1 min-h-0">
+              {versions.length === 0 ? (
+                <div className="text-center text-zinc-500 py-8">
+                  No versions saved yet. Generate an app and click Save.
+                </div>
+              ) : (
+                versions.map((v, i) => (
+                  <div key={v.id} className="bg-[#1a1a1a] border border-[#333] rounded-xl p-4 flex flex-col gap-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="text-sm font-medium text-white mb-1">Version {versions.length - i}</div>
+                        <div className="text-xs text-zinc-500">{new Date(v.timestamp).toLocaleString()}</div>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setPrompt(v.prompt);
+                          setCode(v.code);
+                          setRefreshKey(prev => prev + 1);
+                          setShowVersions(false);
+                        }}
+                        className="px-3 py-1.5 bg-[#222] hover:bg-orange-500 hover:text-white text-zinc-300 rounded text-xs font-medium transition-colors border border-[#333] hover:border-orange-500"
+                      >
+                        Restore
+                      </button>
+                    </div>
+                    <div className="text-xs text-zinc-400 truncate bg-[#111] p-2 rounded border border-[#222]">
+                      Prompt: {v.prompt}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Fullscreen Web App Modal */}
       {isFullscreen && code && (

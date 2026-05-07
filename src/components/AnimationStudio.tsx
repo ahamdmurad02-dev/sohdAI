@@ -1,11 +1,31 @@
 import React, { useState, useRef } from 'react';
-import { Film, Play, Pause, SkipBack, SkipForward, Layers, Settings, Wand2, Loader2, RefreshCw, Upload, X, ChevronDown, Download, Youtube, Instagram, Twitter, Facebook, Smartphone, Diamond, User, Sparkles, Camera, Image as ImageIcon, Library } from 'lucide-react';
+import { Film, Play, Pause, SkipBack, SkipForward, Layers, Settings, Wand2, Loader2, RefreshCw, Upload, X, ChevronDown, Download, Youtube, Instagram, Twitter, Facebook, Smartphone, Diamond, User, Sparkles, Camera, Image as ImageIcon, Library, Save, History, Music, Volume2, Video } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 
 interface Keyframe {
   id: string;
   time: number; // 0 to 100 percentage
   prompt: string;
+}
+
+interface CustomAudio {
+  id: string;
+  name: string;
+  file: File;
+}
+
+interface TimelineAudio {
+  id: string;
+  name: string;
+  startPercent: number;
+}
+
+interface Version {
+  id: string;
+  timestamp: number;
+  prompt: string;
+  code: string;
+  keyframes: Keyframe[];
 }
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -25,7 +45,28 @@ export function AnimationStudio() {
   const [playheadPosition, setPlayheadPosition] = useState(10);
   const [keyframes, setKeyframes] = useState<Keyframe[]>([]);
   const [selectedKeyframeId, setSelectedKeyframeId] = useState<string | null>(null);
+  const [customAudios, setCustomAudios] = useState<CustomAudio[]>([]);
+  const [timelineAudios, setTimelineAudios] = useState<TimelineAudio[]>([]);
   const timelineRef = useRef<HTMLDivElement>(null);
+
+  const [versions, setVersions] = useState<Version[]>([]);
+  const [showVersions, setShowVersions] = useState(false);
+
+  const handleSaveVersion = () => {
+    if (!code) {
+      alert('Please generate an animation before saving a version!');
+      return;
+    }
+    const newVersion: Version = {
+      id: Date.now().toString(),
+      timestamp: Date.now(),
+      prompt,
+      code,
+      keyframes: [...keyframes]
+    };
+    setVersions(prev => [newVersion, ...prev]);
+    alert('Animation saved to version history!');
+  };
 
   const animationAssets = [
     { id: 'a1', name: 'Hero Character', type: 'Sprite', icon: User },
@@ -35,8 +76,24 @@ export function AnimationStudio() {
     { id: 'a5', name: 'Cinematic Camera', type: 'Camera', icon: Camera },
   ];
 
-  const handleDragStart = (e: React.DragEvent, assetName: string) => {
+  const videoAssets = [
+    { id: 'v1', name: 'Cinematic Video Clip', type: 'Video', icon: Video },
+    { id: 'v2', name: 'Action Sequence', type: 'Video', icon: Video },
+    { id: 'v3', name: 'B-Roll Footage', type: 'Video', icon: Video },
+  ];
+
+  const audioAssets = [
+    { id: 'au1', name: 'Cinematic Score', type: 'Music', icon: Music },
+    { id: 'au2', name: 'Suspense Build', type: 'Music', icon: Music },
+    { id: 'au3', name: 'Whoosh Transition', type: 'SFX', icon: Volume2 },
+    { id: 'au4', name: 'Impact Hit', type: 'SFX', icon: Volume2 },
+  ];
+
+  const handleDragStart = (e: React.DragEvent, assetName: string, assetType?: string) => {
     e.dataTransfer.setData('text/plain', `[Use Asset: ${assetName}]`);
+    if (assetType === 'Audio') {
+      e.dataTransfer.setData('application/json', JSON.stringify({ type: 'audio-asset', name: assetName }));
+    }
   };
 
   const handleAddKeyframe = () => {
@@ -92,6 +149,9 @@ export function AnimationStudio() {
           }
         });
       }
+
+      parts[0].text += `\n\nCRITICAL: For any requested sound effects or music [Use Asset: ...] or [Use Uploaded Sound: ...], you must synthesize those sounds using Web Audio API to play during the animation. If it is a cinematic video request, you can use a placeholder video element or CSS animations mimicking a video playing.`;
+
 
       const response = await ai.models.generateContent({
         model: 'gemini-3.1-pro-preview',
@@ -153,6 +213,47 @@ export function AnimationStudio() {
     }
   };
 
+  const handleTimelineAudioDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleTimelineAudioDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!timelineRef.current) return;
+    const rect = timelineRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      if (file.type.startsWith('audio/')) {
+        const id = Math.random().toString(36).substr(2, 9);
+        setTimelineAudios(prev => [...prev, { id, name: file.name, startPercent: percentage }]);
+        setPrompt(prev => prev + (prev.endsWith(' ') || prev.length === 0 ? '' : ' ') + `\n[Play audio '${file.name}' at ${Math.round(percentage)}% of animation] `);
+        
+        setCustomAudios(prev => [...prev, { id: Math.random().toString(36).substr(2, 9), name: file.name, file }]);
+      }
+      return;
+    }
+    
+    try {
+      const dataStr = e.dataTransfer.getData('application/json');
+      if (dataStr) {
+        const data = JSON.parse(dataStr);
+        if (data.type === 'uploaded-audio' || data.type === 'audio-asset') {
+          const id = Math.random().toString(36).substr(2, 9);
+          setTimelineAudios(prev => [...prev, { id, name: data.name, startPercent: percentage }]);
+          setPrompt(prev => prev + (prev.endsWith(' ') || prev.length === 0 ? '' : ' ') + `\n[Play audio '${data.name}' at ${Math.round(percentage)}% of animation] `);
+        }
+      }
+    } catch (err) {
+      // ignore
+    }
+  };
+
   const handleReload = () => {
     setRefreshKey(prev => prev + 1);
     setIsPlaying(true);
@@ -160,12 +261,24 @@ export function AnimationStudio() {
 
   return (
     <div className="flex flex-col h-full bg-[#0a0a0a]">
-      <header className="px-8 py-6 border-b border-[#222] flex justify-between items-center">
+      <header className="px-4 md:px-8 py-4 md:py-6 border-b border-[#222] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-0">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Animation Studio</h2>
-          <p className="text-zinc-400 text-sm mt-1">Create and edit animations with AI assistance</p>
+          <h2 className="text-xl md:text-2xl font-semibold tracking-tight">Animation Studio</h2>
+          <p className="text-zinc-400 text-xs md:text-sm mt-1">Create and edit animations with AI assistance</p>
         </div>
-        <div className="flex gap-2 relative">
+        <div className="flex gap-2 relative self-end md:self-auto">
+          <button 
+            onClick={() => setShowVersions(true)}
+            className="px-4 py-2 bg-[#111] border border-[#333] hover:bg-[#222] text-zinc-300 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+          >
+            <History size={16} /> Versions {versions.length > 0 && `(${versions.length})`}
+          </button>
+          <button 
+            onClick={handleSaveVersion}
+            className="px-4 py-2 bg-[#111] hover:bg-[#222] border border-[#333] text-zinc-300 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+          >
+            <Save size={16} /> Save
+          </button>
           <button 
             onClick={() => setShowExportMenu(!showExportMenu)}
             className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
@@ -205,10 +318,10 @@ export function AnimationStudio() {
 
       <div className="flex-1 overflow-hidden flex flex-col">
         {/* Top Section: Preview & Properties */}
-        <div className="flex-1 flex min-h-0">
+        <div className="flex-1 flex flex-col md:flex-row min-h-0">
           {/* Main Preview */}
           <div 
-            className={`flex-1 relative flex items-center justify-center border-r border-[#222] transition-colors ${isDragging ? 'bg-orange-500/10 border-orange-500' : 'bg-[#111]'}`}
+            className={`flex-1 relative flex items-center justify-center border-b md:border-b-0 md:border-r border-[#222] transition-colors min-h-[50vh] md:min-h-0 ${isDragging ? 'bg-orange-500/10 border-orange-500' : 'bg-[#111]'}`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
@@ -281,7 +394,7 @@ export function AnimationStudio() {
           </div>
 
           {/* Right Panel: Properties or Assets */}
-          <div className="w-72 bg-[#0f0f0f] flex flex-col border-l border-[#222]">
+          <div className="w-full md:w-72 bg-[#0f0f0f] flex flex-col md:border-l border-[#222] shrink-0">
             <div className="flex border-b border-[#222]">
               <button 
                 onClick={() => setRightTab('properties')}
@@ -346,7 +459,7 @@ export function AnimationStudio() {
                   </div>
                 </div>
               ) : (
-                <div className="p-4 space-y-4">
+                <div className="p-4 space-y-6">
                   <div>
                     <h4 className="text-xs font-medium text-zinc-400 uppercase tracking-wide mb-2">
                        Animation Pack
@@ -367,6 +480,120 @@ export function AnimationStudio() {
                           </div>
                         );
                       })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-medium text-zinc-400 uppercase tracking-wide mb-2 flex items-center justify-between">
+                       Video Clips
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      {videoAssets.map((asset) => {
+                        const Icon = asset.icon;
+                        return (
+                          <div 
+                            key={asset.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, asset.name)}
+                            className="bg-[#1a1a1a] border border-[#333] hover:border-orange-500/50 hover:bg-[#222] p-3 rounded-lg cursor-grab active:cursor-grabbing transition-all group"
+                          >
+                            <Icon size={20} className="text-zinc-400 group-hover:text-orange-500 mb-2 transition-colors" />
+                            <div className="text-xs font-medium text-zinc-300 truncate" title={asset.name}>{asset.name}</div>
+                            <div className="text-[10px] text-zinc-500 mt-1">{asset.type}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    
+                    <div className="mt-4 pt-4 border-t border-[#222]">
+                      <button 
+                        onClick={() => document.getElementById('video-upload')?.click()}
+                        className="w-full py-3 rounded border border-dashed border-[#333] hover:border-orange-500/50 flex flex-col items-center justify-center text-zinc-500 hover:text-orange-500 transition-colors bg-[#1a1a1a] cursor-pointer"
+                      >
+                        <Upload size={16} className="mb-1" />
+                        <span className="text-[10px] uppercase font-medium">Upload Custom Video</span>
+                      </button>
+                      <input 
+                        type="file" 
+                        id="video-upload" 
+                        accept="video/*" 
+                        className="hidden" 
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            const fileName = e.target.files[0].name;
+                            setPrompt(prev => prev + (prev.endsWith(' ') || prev.length === 0 ? '' : ' ') + `[Use Uploaded Video: ${fileName}] `);
+                            alert(`Video "${fileName}" added to instructions!`);
+                            e.target.value = '';
+                          }
+                        }} 
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-medium text-zinc-400 uppercase tracking-wide mb-2 flex items-center justify-between">
+                       Audio & Music
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      {audioAssets.map((asset) => {
+                        const Icon = asset.icon;
+                        return (
+                          <div 
+                            key={asset.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, asset.name, 'Audio')}
+                            className="bg-[#1a1a1a] border border-[#333] hover:border-orange-500/50 hover:bg-[#222] p-3 rounded-lg cursor-grab active:cursor-grabbing transition-all group"
+                          >
+                            <Icon size={20} className="text-zinc-400 group-hover:text-orange-500 mb-2 transition-colors" />
+                            <div className="text-xs font-medium text-zinc-300 truncate" title={asset.name}>{asset.name}</div>
+                            <div className="text-[10px] text-zinc-500 mt-1">{asset.type}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    
+                    {customAudios.length > 0 && (
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        {customAudios.map((audio) => (
+                          <div 
+                            key={audio.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, audio.name, 'Audio')}
+                            className="bg-[#1a1a1a] border border-[#333] hover:border-orange-500/50 hover:bg-[#222] p-3 rounded-lg cursor-grab active:cursor-grabbing transition-all group"
+                          >
+                            <Volume2 size={20} className="text-zinc-400 group-hover:text-orange-500 mb-2 transition-colors" />
+                            <div className="text-xs font-medium text-zinc-300 truncate" title={audio.name}>{audio.name}</div>
+                            <div className="text-[10px] text-zinc-500 mt-1">Uploaded</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <div className="mt-4 pt-4 border-t border-[#222]">
+                      <button 
+                        onClick={() => document.getElementById('audio-upload')?.click()}
+                        className="w-full py-3 rounded border border-dashed border-[#333] hover:border-orange-500/50 flex flex-col items-center justify-center text-zinc-500 hover:text-orange-500 transition-colors bg-[#1a1a1a] cursor-pointer"
+                      >
+                        <Upload size={16} className="mb-1" />
+                        <span className="text-[10px] uppercase font-medium">Upload Custom Audio</span>
+                      </button>
+                      <input 
+                        type="file" 
+                        id="audio-upload" 
+                        accept="audio/*" 
+                        className="hidden" 
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            const file = e.target.files[0];
+                            setCustomAudios(prev => [...prev, {
+                                id: Math.random().toString(36).substr(2, 9),
+                                name: file.name,
+                                file
+                            }]);
+                            e.target.value = '';
+                          }
+                        }} 
+                      />
                     </div>
                   </div>
                 </div>
@@ -411,30 +638,34 @@ export function AnimationStudio() {
           </div>
 
           {/* Timeline Tracks */}
-          <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 flex overflow-x-auto md:overflow-hidden">
             {/* Track Headers */}
-            <div className="w-48 border-r border-[#222] bg-[#151515] flex flex-col">
-              <div className="h-8 border-b border-[#222] flex items-center px-3 text-xs text-zinc-500">
+            <div className="w-24 md:w-48 border-r border-[#222] bg-[#151515] flex flex-col shrink-0">
+              <div className="h-8 border-b border-[#222] flex items-center px-2 md:px-3 text-[10px] md:text-xs text-zinc-500">
                 Tracks
               </div>
               <div className="flex-1 overflow-y-auto">
-                <div className="h-10 border-b border-[#222] flex items-center px-3 gap-2 bg-[#1a1a1a]">
-                  <Layers size={14} className="text-orange-500" />
-                  <span className="text-xs text-zinc-300">Generated Animation</span>
+                <div className="h-10 border-b border-[#222] flex items-center px-2 md:px-3 gap-1 md:gap-2 bg-[#1a1a1a]">
+                  <Layers size={14} className="text-orange-500 shrink-0" />
+                  <span className="text-[10px] md:text-xs text-zinc-300 truncate">Generated Animation</span>
                 </div>
-                <div className="h-10 border-b border-[#222] flex items-center px-3 gap-2">
-                  <Layers size={14} className="text-zinc-500" />
-                  <span className="text-xs text-zinc-400">Background</span>
+                <div className="h-10 border-b border-[#222] flex items-center px-2 md:px-3 gap-1 md:gap-2">
+                  <Layers size={14} className="text-zinc-500 shrink-0" />
+                  <span className="text-[10px] md:text-xs text-zinc-400 truncate">Background</span>
                 </div>
-                <div className="h-10 border-b border-[#222] flex items-center px-3 gap-2">
-                  <Layers size={14} className="text-zinc-500" />
-                  <span className="text-xs text-zinc-400">Camera</span>
+                <div className="h-10 border-b border-[#222] flex items-center px-2 md:px-3 gap-1 md:gap-2">
+                  <Layers size={14} className="text-zinc-500 shrink-0" />
+                  <span className="text-[10px] md:text-xs text-zinc-400 truncate">Camera</span>
+                </div>
+                <div className="h-10 border-b border-[#222] flex items-center px-2 md:px-3 gap-1 md:gap-2">
+                  <Volume2 size={14} className="text-zinc-500 shrink-0" />
+                  <span className="text-[10px] md:text-xs text-zinc-400 truncate">Audio track</span>
                 </div>
               </div>
             </div>
 
             {/* Track Content */}
-            <div className="flex-1 bg-[#0a0a0a] relative overflow-hidden">
+            <div className="flex-1 bg-[#0a0a0a] relative overflow-x-auto overflow-y-hidden min-w-[300px]">
               {/* Time Ruler */}
               <div 
                 ref={timelineRef}
@@ -490,10 +721,88 @@ export function AnimationStudio() {
                   <span className="text-[10px] text-purple-200">Pan Right</span>
                 </div>
               </div>
+              <div 
+                className="h-10 border-b border-[#222] relative bg-[#111]/50 border-dashed border-[#333] hover:bg-[#222]/50 transition-colors"
+                onDragOver={handleTimelineAudioDragOver}
+                onDrop={handleTimelineAudioDrop}
+              >
+                {timelineAudios.length === 0 && (
+                   <div className="absolute inset-0 flex items-center justify-center text-[10px] text-zinc-600 pointer-events-none">
+                     Drop audio clips here
+                   </div>
+                )}
+                {timelineAudios.map(audio => (
+                  <div 
+                    key={audio.id}
+                    className="absolute top-1.5 bottom-1.5 min-w-[100px] max-w-[200px] bg-green-500/20 border border-green-500/50 rounded flex items-center px-2 z-20"
+                    style={{ left: `${audio.startPercent}%` }}
+                    title={audio.name}
+                  >
+                    <span className="text-[10px] text-green-200 truncate pr-4">{audio.name}</span>
+                    <button 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setTimelineAudios(prev => prev.filter(a => a.id !== audio.id));
+                        }}
+                        className="absolute right-1 text-green-400 hover:text-green-200"
+                    >
+                        <X size={10} />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
       </div>
+      {/* Versions Modal */}
+      {showVersions && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-[#111] border border-[#333] rounded-2xl w-full max-w-lg p-6 max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-6 shrink-0">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2"><History size={20} className="text-orange-500"/> Version History</h3>
+              <button onClick={() => setShowVersions(false)} className="text-zinc-400 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-3 overflow-y-auto pr-2 flex-1 min-h-0">
+              {versions.length === 0 ? (
+                <div className="text-center text-zinc-500 py-8">
+                  No versions saved yet. Generate an animation and click Save.
+                </div>
+              ) : (
+                versions.map((v, i) => (
+                  <div key={v.id} className="bg-[#1a1a1a] border border-[#333] rounded-xl p-4 flex flex-col gap-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="text-sm font-medium text-white mb-1">Version {versions.length - i}</div>
+                        <div className="text-xs text-zinc-500">{new Date(v.timestamp).toLocaleString()} • {v.keyframes.length} Keyframes</div>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setPrompt(v.prompt);
+                          setCode(v.code);
+                          setKeyframes(v.keyframes);
+                          setRefreshKey(prev => prev + 1);
+                          setShowVersions(false);
+                          setIsPlaying(true);
+                        }}
+                        className="px-3 py-1.5 bg-[#222] hover:bg-orange-500 hover:text-white text-zinc-300 rounded text-xs font-medium transition-colors border border-[#333] hover:border-orange-500"
+                      >
+                        Restore
+                      </button>
+                    </div>
+                    <div className="text-xs text-zinc-400 truncate bg-[#111] p-2 rounded border border-[#222]">
+                      Prompt: {v.prompt || '(Used Keyframes)'}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
