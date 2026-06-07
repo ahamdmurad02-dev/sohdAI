@@ -1,9 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { Image as ImageIcon, Wand2, Upload, Download, Loader2, Maximize, Palette, ChevronDown, Save } from 'lucide-react';
-import { GoogleGenAI } from '@google/genai';
+import { Image as ImageIcon, Wand2, Upload, Download, Loader2, Maximize, Palette, ChevronDown } from 'lucide-react';
 import { motion } from 'motion/react';
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+import toast from 'react-hot-toast';
 
 type Tab = 'generate' | 'edit' | 'upscale' | 'filters';
 
@@ -21,12 +19,18 @@ export function ImageStudio() {
     if (!prompt.trim() || isLoading) return;
     setIsLoading(true);
     try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: {
-          parts: [{ text: prompt }],
-        },
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'gemini-2.5-flash-image',
+          contents: {
+            parts: [{ text: prompt }],
+          },
+        })
       });
+      if (!res.ok) throw new Error('API error');
+      const response = await res.json();
       
       for (const part of response.candidates?.[0]?.content?.parts || []) {
         if (part.inlineData) {
@@ -35,7 +39,7 @@ export function ImageStudio() {
       }
     } catch (error) {
       console.error('Image generation error:', error);
-      alert('Failed to generate image. Please try again.');
+      toast.error('Failed to generate image. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -48,20 +52,26 @@ export function ImageStudio() {
       const base64Data = sourceImage.split(',')[1];
       const mimeType = sourceImage.split(';')[0].split(':')[1];
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                data: base64Data,
-                mimeType: mimeType,
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'gemini-2.5-flash-image',
+          contents: {
+            parts: [
+              {
+                inlineData: {
+                  data: base64Data,
+                  mimeType: mimeType,
+                },
               },
-            },
-            { text: prompt },
-          ],
-        },
+              { text: prompt },
+            ],
+          },
+        })
       });
+      if (!res.ok) throw new Error('API error');
+      const response = await res.json();
 
       for (const part of response.candidates?.[0]?.content?.parts || []) {
         if (part.inlineData) {
@@ -70,7 +80,7 @@ export function ImageStudio() {
       }
     } catch (error) {
       console.error('Image editing error:', error);
-      alert('Failed to edit image. Please try again.');
+      toast.error('Failed to edit image. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -84,20 +94,26 @@ export function ImageStudio() {
       const base64Data = sourceImage.split(',')[1];
       const mimeType = sourceImage.split(';')[0].split(':')[1];
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                data: base64Data,
-                mimeType: mimeType,
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'gemini-2.5-flash-image',
+          contents: {
+            parts: [
+              {
+                inlineData: {
+                  data: base64Data,
+                  mimeType: mimeType,
+                },
               },
-            },
-            { text: "enhance details, upscale resolution, make it sharper and higher quality" },
-          ],
-        },
+              { text: "enhance details, upscale resolution, make it sharper and higher quality" },
+            ],
+          },
+        })
       });
+      if (!res.ok) throw new Error('API error');
+      const response = await res.json();
 
       for (const part of response.candidates?.[0]?.content?.parts || []) {
         if (part.inlineData) {
@@ -106,7 +122,7 @@ export function ImageStudio() {
       }
     } catch (error) {
       console.error('Upscale error:', error);
-      alert('Failed to upscale image.');
+      toast.error('Failed to upscale image.');
     } finally {
       setIsLoading(false);
     }
@@ -119,20 +135,26 @@ export function ImageStudio() {
       const base64Data = sourceImage.split(',')[1];
       const mimeType = sourceImage.split(';')[0].split(':')[1];
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                data: base64Data,
-                mimeType: mimeType,
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'gemini-2.5-flash-image',
+          contents: {
+            parts: [
+              {
+                inlineData: {
+                  data: base64Data,
+                  mimeType: mimeType,
+                },
               },
-            },
-            { text: `apply a ${filterPrompt} filter, keep the original subject intact` },
-          ],
-        },
+              { text: `apply a ${filterPrompt} filter, keep the original subject intact` },
+            ],
+          },
+        })
       });
+      if (!res.ok) throw new Error('API error');
+      const response = await res.json();
 
       for (const part of response.candidates?.[0]?.content?.parts || []) {
         if (part.inlineData) {
@@ -141,7 +163,7 @@ export function ImageStudio() {
       }
     } catch (error) {
       console.error('Filter error:', error);
-      alert('Failed to apply filter.');
+      toast.error('Failed to apply filter.');
     } finally {
       setIsLoading(false);
     }
@@ -204,8 +226,11 @@ export function ImageStudio() {
       const link = document.createElement('a');
       link.href = dataUrl;
       link.download = `sohdAI-image-${img.width * scale}x${img.height * scale}.${format === 'jpeg' ? 'jpg' : 'png'}`;
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
     };
+    img.crossOrigin = 'anonymous';
     img.src = image;
   };
 
@@ -218,26 +243,16 @@ export function ImageStudio() {
 
   return (
     <div className="flex flex-col h-full bg-[#0a0a0a]">
-      <header className="px-4 md:px-8 py-4 md:py-6 border-b border-[#222] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-0">
-        <div>
-          <h2 className="text-xl md:text-2xl font-semibold tracking-tight">Image Studio</h2>
-          <p className="text-zinc-400 text-xs md:text-sm mt-1">Generate, edit, upscale, and filter images with AI</p>
-        </div>
-        <div className="flex gap-2 self-end md:self-auto">
-          <button 
-            onClick={() => alert('Image saved to library!')}
-            className="px-4 py-2 bg-[#111] hover:bg-[#222] border border-[#333] text-zinc-300 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-          >
-            <Save size={16} /> Save
-          </button>
-        </div>
+      <header className="pr-4 md:pr-8 py-4 md:py-6 border-b border-[#222] pl-16 md:px-8">
+        <h2 className="text-xl md:text-2xl font-semibold tracking-tight">Image Studio</h2>
+        <p className="text-zinc-400 text-xs md:text-sm mt-1">Generate, edit, upscale, and filter images with AI</p>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-8">
-        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="flex-1 overflow-y-auto p-8">
+        <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-8">
           
           {/* Controls Sidebar */}
-          <div className="lg:col-span-4 space-y-8">
+          <div className="md:col-span-4 space-y-8">
             <div className="flex bg-[#111] p-1 rounded-lg border border-[#222]">
               {tabs.map(tab => (
                 <button
@@ -344,7 +359,7 @@ export function ImageStudio() {
           </div>
 
           {/* Preview Area */}
-          <div className="lg:col-span-8 flex flex-col items-center justify-center min-h-[500px] bg-[#111] border border-[#222] rounded-2xl p-4 relative overflow-hidden">
+          <div className="md:col-span-8 flex flex-col items-center justify-center min-h-[500px] bg-[#111] border border-[#222] rounded-2xl p-4 relative overflow-hidden">
             {isLoading && (
               <div className="absolute inset-0 bg-[#0a0a0a]/80 backdrop-blur-sm flex flex-col items-center justify-center z-10">
                 <Loader2 size={32} className="text-orange-500 animate-spin mb-4" />
@@ -359,24 +374,24 @@ export function ImageStudio() {
                   alt="Generated" 
                   className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" 
                 />
-                <div className={`absolute top-4 right-4 transition-opacity ${showDownloadMenu ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                <div className={`absolute top-4 right-4`}>
                   <div className="relative">
                     <button 
                       onClick={() => setShowDownloadMenu(!showDownloadMenu)}
-                      className="flex items-center gap-2 bg-black/50 backdrop-blur-md rounded-lg px-3 py-2 text-white hover:bg-black/80 transition-colors text-sm font-medium"
+                      className="flex items-center gap-2 bg-black/60 backdrop-blur-md border border-white/20 rounded-lg px-4 py-2.5 text-white hover:bg-black/90 transition-all text-sm font-medium shadow-xl"
                     >
                       <Download size={16} />
-                      Download
+                      Download Image
                       <ChevronDown size={14} />
                     </button>
                     
                     {showDownloadMenu && (
                       <div className="absolute top-full right-0 mt-2 w-48 bg-[#1a1a1a] border border-[#333] rounded-xl shadow-xl overflow-hidden z-20">
-                        <div className="p-2 text-xs font-medium text-zinc-400 uppercase tracking-wider">Format & Size</div>
-                        <button onClick={() => { handleDownload('png', 1); setShowDownloadMenu(false); }} className="w-full text-left px-4 py-2 text-sm text-zinc-200 hover:bg-[#222] hover:text-white transition-colors">PNG (Original)</button>
-                        <button onClick={() => { handleDownload('jpeg', 1); setShowDownloadMenu(false); }} className="w-full text-left px-4 py-2 text-sm text-zinc-200 hover:bg-[#222] hover:text-white transition-colors">JPG (Original)</button>
-                        <button onClick={() => { handleDownload('png', 2); setShowDownloadMenu(false); }} className="w-full text-left px-4 py-2 text-sm text-zinc-200 hover:bg-[#222] hover:text-white transition-colors">PNG (2x Resolution)</button>
-                        <button onClick={() => { handleDownload('jpeg', 2); setShowDownloadMenu(false); }} className="w-full text-left px-4 py-2 text-sm text-zinc-200 hover:bg-[#222] hover:text-white transition-colors">JPG (2x Resolution)</button>
+                        <div className="p-2 text-xs font-medium text-zinc-400 uppercase tracking-wider bg-[#111] border-b border-[#333]">Format & Size</div>
+                        <button onClick={() => { handleDownload('png', 1); setShowDownloadMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-200 hover:bg-[#222] hover:text-white transition-colors">PNG (Original)</button>
+                        <button onClick={() => { handleDownload('jpeg', 1); setShowDownloadMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-200 hover:bg-[#222] hover:text-white transition-colors border-b border-[#333]/50">JPG (Original)</button>
+                        <button onClick={() => { handleDownload('png', 2); setShowDownloadMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-200 hover:bg-[#222] hover:text-white transition-colors">PNG (2x Enhance)</button>
+                        <button onClick={() => { handleDownload('jpeg', 2); setShowDownloadMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-zinc-200 hover:bg-[#222] hover:text-white transition-colors">JPG (2x Enhance)</button>
                       </div>
                     )}
                   </div>

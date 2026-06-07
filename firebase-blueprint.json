@@ -34,12 +34,30 @@
         }
       },
       "required": ["uid", "email", "role", "createdAt"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "A game project saved by the user.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "dimension": { "type": "string", "enum": ["2D", "3D"] },
+        "timestamp": { "type": "number" },
+        "thumbnail": { "type": "string" }
+      },
+      "required": ["id", "name", "code", "dimension", "timestamp"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": { "$ref": "#/entities/User" },
       "description": "Stores user profiles."
+    },
+    "/users/{userId}/projects/{projectId}": {
+      "schema": { "$ref": "#/entities/Project" },
+      "description": "Stores the user's saved game projects."
     }
   }
 }
